@@ -4,7 +4,7 @@ AI-Driven Operations Intelligence System for the Conut cafe chain. Turns real sa
 
 > **Team 503 - AUB AI Engineering Hackathon**
 > Professor Ammar Mohanna
-
+> Students: Sleiman Mhanna (202672987) - Ali A. Waked (202670777) -Karim Hajj Ali (2022306125)
 ---
 
 ## How to Run
