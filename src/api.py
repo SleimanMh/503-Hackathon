@@ -209,12 +209,20 @@ if FASTAPI_AVAILABLE:
             att_stats = result["attendance_stats"]
             prod = result["productivity_index"]
 
-            # Fuzzy branch match
-            matched = None
+            # Fuzzy branch match — prefer exact, then longest common substring
+            branch_lower = branch.lower()
+            candidates = []
             for b in rec.keys():
-                if branch.lower() in b.lower() or b.lower() in branch.lower():
-                    matched = b
-                    break
+                b_lower = b.lower()
+                if b_lower == branch_lower:
+                    candidates.append((0, b))   # exact match — highest priority
+                elif branch_lower in b_lower:
+                    candidates.append((1, b))   # query is substring of key
+                elif b_lower in branch_lower:
+                    candidates.append((2, b))   # key is substring of query
+            # Sort: exact first, then by descending key length (longest = most specific)
+            candidates.sort(key=lambda x: (x[0], -len(x[1])))
+            matched = candidates[0][1] if candidates else None
             if not matched:
                 raise HTTPException(
                     status_code=404,
@@ -252,11 +260,18 @@ if FASTAPI_AVAILABLE:
         try:
             result = _cached_combos()
             if branch:
-                matched = None
+                branch_lower = branch.lower()
+                candidates = []
                 for b in result["rules_by_branch"].keys():
-                    if branch.lower() in b.lower():
-                        matched = b
-                        break
+                    b_lower = b.lower()
+                    if b_lower == branch_lower:
+                        candidates.append((0, b))
+                    elif branch_lower in b_lower:
+                        candidates.append((1, b))
+                    elif b_lower in branch_lower:
+                        candidates.append((2, b))
+                candidates.sort(key=lambda x: (x[0], -len(x[1])))
+                matched = candidates[0][1] if candidates else None
                 rules = result["rules_by_branch"].get(matched, result["global_rules"])
             else:
                 rules = result["global_rules"]
@@ -283,11 +298,18 @@ if FASTAPI_AVAILABLE:
             result = _cached_forecast()
             forecasts = result["forecasts"]
 
-            matched = None
+            branch_lower = branch.lower()
+            candidates = []
             for b in forecasts.keys():
-                if branch.lower() in b.lower() or b.lower() in branch.lower():
-                    matched = b
-                    break
+                b_lower = b.lower()
+                if b_lower == branch_lower:
+                    candidates.append((0, b))
+                elif branch_lower in b_lower:
+                    candidates.append((1, b))
+                elif b_lower in branch_lower:
+                    candidates.append((2, b))
+            candidates.sort(key=lambda x: (x[0], -len(x[1])))
+            matched = candidates[0][1] if candidates else None
             if not matched:
                 raise HTTPException(
                     status_code=404,
@@ -346,6 +368,7 @@ if FASTAPI_AVAILABLE:
                     ].head(8)[["item", "category", "total_qty", "rev_per_unit"]]
                 ),
                 "strategy_recommendations": result["strategy_recommendations"],
+                "strategies_count": len(result["strategy_recommendations"]),
             }
             return JSONResponse(content=_safe_dict(payload))
         except HTTPException:
@@ -386,9 +409,25 @@ if FASTAPI_AVAILABLE:
             elif intent == "staffing":
                 b = branch or "Conut Jnah"
                 result = staffing(b)
+                # inject intent into the response
+                body = result.body if hasattr(result, "body") else None
+                if body:
+                    import json as _json
+                    data = _json.loads(body)
+                    data["intent"] = "staffing"
+                    data["query"] = query
+                    return JSONResponse(content=data)
                 return result
             elif intent == "combos":
-                return combos(branch=branch, top_n=10)
+                result = combos(branch=branch, top_n=10)
+                body = result.body if hasattr(result, "body") else None
+                if body:
+                    import json as _json
+                    data = _json.loads(body)
+                    data["intent"] = "combos"
+                    data["query"] = query
+                    return JSONResponse(content=data)
+                return result
             elif intent == "forecast":
                 b = branch or "all"
                 if b == "all":
@@ -406,9 +445,25 @@ if FASTAPI_AVAILABLE:
                             if "error" not in fc
                         }),
                     })
-                return forecast(b)
+                result = forecast(b)
+                body = result.body if hasattr(result, "body") else None
+                if body:
+                    import json as _json
+                    data = _json.loads(body)
+                    data["intent"] = "forecast"
+                    data["query"] = query
+                    return JSONResponse(content=data)
+                return result
             elif intent == "coffee":
-                return coffee_strategy()
+                result = coffee_strategy()
+                body = result.body if hasattr(result, "body") else None
+                if body:
+                    import json as _json
+                    data = _json.loads(body)
+                    data["intent"] = "coffee"
+                    data["query"] = query
+                    return JSONResponse(content=data)
+                return result
             else:
                 return JSONResponse(content={
                     "query": query,
