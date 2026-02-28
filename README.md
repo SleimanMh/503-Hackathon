@@ -1,417 +1,190 @@
-# 🚀 Conut AI Chief of Operations
+﻿# Conut AI Chief of Operations
 
-**AI-Driven Operations Intelligence System for Conut Café Chain**
+AI-Driven Operations Intelligence System for the Conut cafe chain. Turns real sales and attendance data into actionable business decisions across 5 objectives, with a natural language interface via OpenClaw.
 
-An end-to-end AI system addressing 5 critical business objectives through ML-powered analysis of real operational data.
-
-> **Team 503 · AUB AI Engineering Hackathon**  
+> **Team 503 - AUB AI Engineering Hackathon**
 > Professor Ammar Mohanna
 
 ---
 
-## 📋 Quick Start
+## How to Run
 
-### 1. Create Virtual Environment
 ```bash
+# 1. Create and activate virtual environment
 python -m venv .venv
-```
+.\.venv\Scripts\Activate.ps1        # Windows
+# source .venv/bin/activate          # Mac/Linux
 
-### 2. Activate Virtual Environment
-**Windows:**
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-**Mac/Linux:**
-```bash
-source .venv/bin/activate
-```
-
-### 3. Install Dependencies
-```bash
+# 2. Install dependencies
 pip install -r requirements.txt
-```
 
-### 4. Run the System
-```bash
+# 3. Start the server
 python main.py
 ```
 
-### 5. Access the API
-- **Interactive Docs**: http://localhost:8000/docs
-- **API Root**: http://localhost:8000
-- **Health Check**: http://localhost:8000/health
+Access the system at:
+- API Docs: http://localhost:8000/docs
+- Health Check: http://localhost:8000/health
+- Natural Language: http://localhost:8000/ask?query=Should we open a new branch?
 
 ---
 
-## 📁 Project Structure
+## Business Objectives
+
+### Objective 1 - Combo Optimization
+Identifies which products are frequently purchased together using association rule mining (Apriori algorithm). Helps design bundles and cross-sell promotions.
+
+- **API**: `GET /api/combos/analysis`
+- **Result**: 409 combos found. Top pair: DELIVERY CHARGE + NUTELLA SPREAD CHIMNEY
+
+### Objective 2 - Demand Forecasting
+Forecasts demand per branch using time-series analysis on monthly sales data. Detects trends, seasonal patterns, and calculates growth rates with confidence intervals to support inventory and supply chain decisions.
+
+- **API**: `GET /api/forecast/demand?branch={branch}&months={n}` — branch forecast with confidence intervals
+- **API**: `GET /api/forecast/all-branches` — compare demand across all branches
+- **API**: `GET /api/forecast/trends?branch={branch}` — historical trend analysis
+- **API**: `GET /api/forecast/accuracy` — model performance metrics
+- **Method**: Linear trend fitting + moving averages + seasonality detection
+- **Data**: Monthly sales by branch (`rep_s_00334_1_SMRY.csv`)
+
+### Objective 3 - Branch Expansion Feasibility
+Scores each branch across multiple dimensions to determine if opening a new branch is viable and which existing branch to replicate.
+
+- **API**: `GET /api/expansion`
+- **Result**: GO decision. Replicate Main Street Coffee (score: 100/100, +176% monthly growth)
+
+### Objective 4 - Shift Staffing Estimation
+Recommends how many employees are needed per shift at each branch, based on demand patterns and attendance data.
+
+- **API**: `GET /api/staffing/{branch}`
+- **Result**: 2-3 staff per shift depending on branch productivity
+
+### Objective 5 - Coffee and Milkshake Growth Strategy
+Segments customers and identifies top revenue opportunities to grow beverage sales, with 12-month projections.
+
+- **API**: `GET /api/growth`
+- **Result**: Hot-Coffee leads at 50.7% revenue share. Top opportunity: PISTACHIO MILKSHAKE
+
+---
+
+## OpenClaw Integration
+
+[OpenClaw](https://openclaw.ai) is a personal AI assistant that runs locally and connects to Telegram, WhatsApp, or Discord. We provide a **skill** (`skills/conut-ops/SKILL.md`) that lets OpenClaw query our system using natural language.
+
+### How It Works
 
 ```
-503-Hackathon/
-├── main.py                              # 🌟 Main API server (run this!)
-├── requirements.txt                      # Python dependencies
-├── .venv/                               # Virtual environment
-│
-├── data/                                # CSV data files
-│   ├── REP_S_00502.csv                  # Sales by customer
-│   ├── rep_s_00334_1_SMRY.csv           # Monthly sales
-│   ├── REP_S_00461.csv                  # Attendance logs
-│   └── ...                              # Other data files
-│
-├── src/                                 # Source code
-│   ├── objective_1_combos.py            # ✅ Combo optimization (ML)
-│   ├── objective_2_demand_forecast.py   # ⚠️ Demand forecasting (placeholder)
-│   ├── objective_3_expansion.py         # ✅ Expansion analysis
-│   ├── objective_4_staffing.py          # ✅ Staffing estimation
-│   ├── objective_5_growth_strategy.py   # ✅ Growth strategy
-│   └── data_loader.py                   # CSV loading utilities
-│
-└── docs/                                # Documentation
-    ├── RUNNING_SYSTEM_GUIDE.md
-    ├── SYSTEM_ANALYSIS_AND_GAPS.md
-    └── ...
+User on Telegram: "Should we open a new branch?"
+        |
+    OpenClaw (local)
+        |  conut-ops skill
+    GET http://localhost:8000/ask?query=Should we open a new branch?
+        |
+    FastAPI detects intent -> routes to Objective 3 (Expansion)
+        |
+    OpenClaw replies: "GO. Replicate Main Street Coffee."
 ```
 
----
+### Natural Language Queries
 
-## 🎯 Business Objectives
-
-### ✅ Objective 1: Combo Optimization
-**Status**: Complete with ML (Apriori Algorithm)
-- Identifies optimal product combinations from customer purchasing patterns
-- Uses association rule mining (support, confidence, lift)
-- **ML Model**: Apriori algorithm (mlxtend)
-- **API**: `/api/combos/analysis`
-
-**Key Results**:
-- 136 transactions analyzed
-- 35 association rules generated
-- Top combo: SINGLE ESPRESSO → HOT drink (lift: 17.00)
-
-### ⚠️ Objective 2: Demand Forecasting
-**Status**: Placeholder - Needs Implementation
-- Should forecast demand per branch for inventory planning
-- Requires time series model (Prophet/XGBoost)
-- **API**: `/api/demand-forecast` (currently returns placeholder)
-
-**🚨 Critical Gap**: Only placeholder implemented
-
-### ✅ Objective 3: Branch Expansion Feasibility
-**Status**: Complete (Statistical Analysis)
-- Evaluates viability of opening new branches
-- Multi-dimensional scoring of existing branches
-- **API**: `/api/expansion`
-
-**Key Results**:
-| Branch | Expansion Score | Monthly Growth |
-|--------|----------------|---------------|
-| Main Street Coffee | 100 / 100 | +176%/month |
-| Conut Jnah | 91 / 100 | +68%/month |
-| Conut - Tyre | 49 / 100 | +21%/month |
-| Conut | 0 / 100 | -41%/month |
-
-**Recommendation**: Replicate Main Street Coffee model
-
-### ✅ Objective 4: Shift Staffing Estimation
-**Status**: Complete (Formula-Based)
-- Estimates required employees per shift
-- Based on demand and attendance data
-- **API**: `/api/staffing/{branch}`
-
-**Key Results**:
-| Branch | Staff Productivity | Recommended/Shift |
-|--------|-------------------|-------------------|
-| Conut Jnah | 5.1M units/staff-hour | 2–3 staff |
-| Main Street Coffee | 3.2M units/staff-hour | 2–3 staff |
-| Conut - Tyre | — | 2 staff |
-| Conut | 50K units/staff-hour | 2 staff |
-
-### ✅ Objective 5: Coffee & Milkshake Growth Strategy
-**Status**: Complete (Customer Segmentation)
-- Data-driven strategies to increase beverage sales
-- Customer segmentation and growth opportunities
-- **API**: `/api/growth`
-
-**Key Results**:
-| Category | Revenue Share | Revenue |
-|----------|--------------|---------|
-| ☕ Hot-Coffee Based | 50.7% | 691 M |
-| 🥤 Shakes (Milkshake) | 22.9% | 311 M |
-| 🧋 Frappes | 16.1% | 219 M |
-| 🍹 Hot and Cold Drinks | 10.3% | 139 M |
-
-**Top Opportunities**: PISTACHIO MILKSHAKE (893K/unit), MATCHA FRAPPE (626K/unit)
-
----
-
-## 🔌 API Endpoints
-
-### Core Endpoints
-- `GET /` - System overview
-- `GET /health` - Health check
-- `GET /ask?query=<text>` - **Natural language queries (OpenClaw)**
-
-### Objective 1: Combos
-- `GET /api/combos/analysis` - Full combo analysis
-- `GET /api/combos/top?limit=5` - Top N combos
-- `GET /api/combos/by-branch/{branch}` - Branch-specific combos
-
-### Objective 2: Demand Forecast
-- `GET /api/demand-forecast?branch={branch}&months={n}` - ⚠️ Placeholder
-
-### Objective 3: Expansion
-- `GET /api/expansion` - Expansion feasibility analysis
-
-### Objective 4: Staffing
-- `GET /api/staffing/{branch}` - Staffing recommendations
-  - Branches: `Conut`, `Conut - Tyre`, `Conut Jnah`, `Main Street Coffee`
-
-### Objective 5: Growth
-- `GET /api/growth` - Coffee & milkshake growth strategy
-
----
-
-## 🤖 Natural Language Queries (OpenClaw)
-
-The `/ask` endpoint automatically routes natural language questions to the appropriate objective:
+The `/ask` endpoint accepts any operational question and automatically routes it:
 
 ```bash
-# Expansion
 curl "http://localhost:8000/ask?query=Should we open a new branch?"
-
-# Combos
-curl "http://localhost:8000/ask?query=What products go well together?"
-
-# Staffing
 curl "http://localhost:8000/ask?query=How many staff do we need at Conut Jnah?"
-
-# Growth
+curl "http://localhost:8000/ask?query=What products go well together?"
 curl "http://localhost:8000/ask?query=How can we increase coffee sales?"
 ```
 
----
+### Setup OpenClaw Skill
 
-## 🧪 Testing
+```powershell
+# 1. Install OpenClaw
+iwr -useb https://openclaw.ai/install.ps1 | iex
 
-### Quick System Check
-```bash
-python check_system_status.py
-```
+# 2. Copy skill
+Copy-Item -Recurse ".\skills\conut-ops" "$env:USERPROFILE\.openclaw\skills\conut-ops"
 
-### Test Unified System
-```bash
-# Start server first
+# 3. Start server
 python main.py
 
-# In another terminal (with .venv activated)
-python test_unified_system.py
-```
-
-### Manual Testing
-```bash
-# Health check
-curl http://localhost:8000/health
-
-# Top 3 combos
-curl "http://localhost:8000/api/combos/top?limit=3"
-
-# Expansion decision
-curl http://localhost:8000/api/expansion
-
-# Staffing for Main Street Coffee
-curl "http://localhost:8000/api/staffing/Main%20Street%20Coffee"
-
-# Growth strategy
-curl http://localhost:8000/api/growth
+# 4. In OpenClaw chat, type /reload then ask any question
 ```
 
 ---
 
-## 📊 Data Sources
+## API Endpoints
 
-All data files are in the `data/` folder:
+| Endpoint | Description |
+|----------|-------------|
+| `GET /ask?query=...` | Natural language query (OpenClaw entry point) |
+| `GET /api/combos/analysis` | Full combo analysis |
+| `GET /api/combos/top?limit=5` | Top N product combos |
+| `GET /api/combos/by-branch/{branch}` | Combos for a specific branch |
+| `GET /api/expansion` | Branch expansion feasibility |
+| `GET /api/staffing/{branch}` | Staffing recommendations |
+| `GET /api/forecast/demand` | Demand forecast for a specific branch |
+| `GET /api/forecast/all-branches` | Compare demand across all branches |
+| `GET /api/forecast/trends` | Historical trend analysis |
+| `GET /api/forecast/accuracy` | Model performance metrics |
+| `GET /api/growth` | Coffee and milkshake growth strategy |
+| `GET /health` | System health check |
 
-| File | Objective | Purpose |
-|------|-----------|---------|
-| `REP_S_00502.csv` | 1 | Customer transactions for combo analysis |
-| `rep_s_00334_1_SMRY.csv` | 2, 3 | Monthly sales by branch |
-| `REP_S_00461.csv` | 4 | Time & attendance logs |
-| `rep_s_00191_SMRY.csv` | 5 | Product sales by category |
-| `rep_s_00150.csv` | 3, 5 | Customer order history |
-| `REP_S_00136_SMRY.csv` | 3 | Division/menu summary |
-| `rep_s_00435_SMRY.csv` | 3 | Average sales by menu |
-| `REP_S_00194_SMRY.csv` | 3 | Tax summary |
-
----
-
-## 🔧 Development
-
-### Run Individual Objectives
-
-```bash
-# Activate virtual environment first
-.\.venv\Scripts\Activate.ps1  # Windows
-# source .venv/bin/activate    # Mac/Linux
-
-# Objective 1: Combo Optimization
-python src/objective_1_combos.py
-
-# Objective 2: Demand Forecast (placeholder)
-python src/objective_2_demand_forecast.py
-
-# Objective 3: Expansion Analysis
-python -c "from src.objective_3_expansion import run_expansion_analysis, print_report; print_report(run_expansion_analysis())"
-
-# Objective 4: Staffing
-python -c "from src.objective_4_staffing import run_staffing_analysis; run_staffing_analysis()"
-
-# Objective 5: Growth Strategy
-python src/objective_5_growth_strategy.py
-```
-
-### Check System Status
-```bash
-python check_system_status.py
-```
-
-This will show:
-- ✅ Implemented objectives
-- ⚠️ Placeholder objectives (Objective 2)
-- ML status for each objective
-- Available API endpoints
+Available branches: `Conut`, `Conut - Tyre`, `Conut Jnah`, `Main Street Coffee`
 
 ---
 
-## 🛠️ Technology Stack
+## Data Sources
+
+All CSV files are in the `data/` folder:
+
+| File | Used For |
+|------|----------|
+| `REP_S_00502.csv` | Customer transactions -> Combo analysis |
+| `rep_s_00334_1_SMRY.csv` | Monthly sales by branch -> Expansion, Forecasting |
+| `REP_S_00461.csv` | Time and attendance -> Staffing |
+| `rep_s_00191_SMRY.csv` | Product sales by category -> Growth strategy |
+| `rep_s_00150.csv` | Customer order history -> Expansion, Growth |
+| `REP_S_00136_SMRY.csv` | Division/menu summary -> Expansion |
+| `rep_s_00435_SMRY.csv` | Average sales by menu -> Expansion |
+| `REP_S_00194_SMRY.csv` | Tax summary by branch -> Expansion |
+
+---
+
+## Tech Stack
 
 | Component | Technology |
-|-----------|-----------|
-| **Framework** | FastAPI 0.104+ |
-| **Server** | Uvicorn (ASGI) |
-| **Data Processing** | Pandas 2.1+, NumPy 1.26+ |
-| **ML - Association Rules** | mlxtend 0.23.0 (Apriori) |
-| **ML - General** | scikit-learn 1.3+, XGBoost 2.0+ |
-| **Visualization** | Matplotlib 3.8+, Seaborn 0.13+, Plotly 5.18+ |
-| **API Validation** | Pydantic |
-| **HTTP Client** | httpx |
+|-----------|------------|
+| API Framework | FastAPI + Uvicorn |
+| Data Processing | Pandas, NumPy |
+| ML - Combos | Apriori association rule mining (mlxtend) |
+| ML - General | scikit-learn, XGBoost |
+| OpenClaw | Skills-based natural language integration |
+| Validation | Pydantic |
 
 ---
 
-## 📚 Documentation
+## Project Structure
 
-- **[RUNNING_SYSTEM_GUIDE.md](RUNNING_SYSTEM_GUIDE.md)** - Detailed usage guide
-- **[SYSTEM_ANALYSIS_AND_GAPS.md](SYSTEM_ANALYSIS_AND_GAPS.md)** - Complete system analysis
-- **[NEXT_STEPS_ACTION_PLAN.md](NEXT_STEPS_ACTION_PLAN.md)** - Implementation roadmap
-- **[FILE_ORGANIZATION.md](FILE_ORGANIZATION.md)** - File structure details
-- **[REORGANIZATION_SUMMARY.md](REORGANIZATION_SUMMARY.md)** - Recent changes
-
----
-
-## ⚠️ Known Issues & Next Steps
-
-### Critical Gap
-- **Objective 2 (Demand Forecasting)** - Only placeholder implemented
-  - Needs: Time series ML model (Prophet, XGBoost, LSTM)
-  - Impact: Professor evaluates "ML rigor" - currently only 1/5 objectives has ML
-
-### ML Enhancement Opportunities
-| Objective | Current | Potential ML Enhancement |
-|-----------|---------|-------------------------|
-| 1 - Combos | ✅ Apriori ML | Already has ML |
-| 2 - Demand | ❌ None | Prophet/XGBoost time series |
-| 3 - Expansion | Statistical | XGBoost classification |
-| 4 - Staffing | Formula | Linear regression/XGBoost |
-| 5 - Growth | Segmentation | K-means clustering |
-
-### Grade Estimates
-- **Current**: 70-75/100
-  - 4/5 objectives working (minus Objective 2)
-  - Only 1/5 has ML model
-  - Good system engineering
-
-- **With Objective 2 ML**: 85-90/100
-  - All 5 objectives working
-  - 2/5 with ML models
-  - Complete system
-
-- **With ML in 3+ objectives**: 90-95/100
-  - All objectives working
-  - Strong ML rigor
-  - Advanced analytics
-
----
-
-## 📈 Evaluation Criteria
-
-The hackathon evaluates on:
-
-1. **Business Impact** (25 points)
-   - Practical recommendations
-   - Data-driven insights
-   - Actionable strategies
-
-2. **Technical Correctness & ML Rigor** (25 points)
-   - Model quality
-   - Appropriate algorithms
-   - Validation methodology
-
-3. **System Engineering (MLOps)** (20 points)
-   - Code organization
-   - API design
-   - Error handling
-
-4. **OpenClaw Integration** (15 points)
-   - Natural language interface
-   - Intent detection
-   - Response quality
-
-5. **Communication Clarity** (15 points)
-   - Documentation
-   - Visualizations
-   - Presentation
-
----
-
-## 🚀 Quick Commands
-
-```bash
-# Setup
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-
-# Run
-python main.py
-
-# Test
-python check_system_status.py
-curl http://localhost:8000/health
-
-# Natural language query
-curl "http://localhost:8000/ask?query=Should we expand?"
+```
+503-Hackathon/
+|-- main.py                             # Main API server (run this)
+|-- requirements.txt                    # Dependencies
+|-- data/                               # CSV data files
+|-- src/
+|   |-- objective_1_combos.py           # Combo optimization
+|   |-- objective_2_demand_forecast.py  # Demand forecasting
+|   |-- objective_3_expansion.py        # Branch expansion
+|   |-- objective_4_staffing.py         # Shift staffing
+|   |-- objective_5_growth_strategy.py  # Growth strategy
+|   `-- data_loader.py                  # CSV parsing utilities
+`-- skills/
+    `-- conut-ops/
+        `-- SKILL.md                    # OpenClaw skill definition
 ```
 
----
-
-## 👥 Team
-
-**Team 503** - AUB AI Engineering Hackathon
-
----
-
-## 📞 Support
-
-For detailed information:
-- **Interactive API Docs**: http://localhost:8000/docs (when running)
-- **System Status**: `python check_system_status.py`
-- **Documentation**: See `docs/` folder
-
----
-
-## 📝 License
-
-This project is for the AUB AI Engineering Hackathon (Professor Ammar Mohanna).
-
----
-
-**Made with ❤️ for Conut** 🥐☕
+Here are the screenshots taken from Open Claw:
+<img width="2549" height="1115" alt="Screenshot 2026-02-28 202248" src="https://github.com/user-attachments/assets/1ff7713a-b63c-4849-99ec-9493a43f847b" />
+<img width="2559" height="1101" alt="Screenshot 2026-02-28 202237" src="https://github.com/user-attachments/assets/51d39aab-af20-4f21-9492-5574f1dfe412" />
+<img width="2559" height="1411" alt="Screenshot 2026-02-28 191012" src="https://github.com/user-attachments/assets/5999bc67-24da-43c5-acc5-159fb89df4b6" />
+<img width="2556" height="1506" alt="Screenshot 2026-02-28 202300" src="https://github.com/user-attachments/assets/a84451e2-d199-41e2-a1ac-c237c4f993e1" />
