@@ -96,8 +96,12 @@ def _safe_dict(obj) -> Any:
         return int(obj)
     if isinstance(obj, (np.floating,)):
         return float(obj)
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
     if isinstance(obj, np.ndarray):
         return obj.tolist()
+    if isinstance(obj, float) and (obj != obj):  # NaN
+        return None
     return obj
 
 
