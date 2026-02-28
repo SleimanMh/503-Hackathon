@@ -15,7 +15,7 @@ from typing import Dict, List
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT / "data"  # CSVs live in the data/ folder
+DATA_DIR = ROOT / "app"  # CSVs live in the app/ folder
 
 
 # ─────────────────────────────────────────────────────────

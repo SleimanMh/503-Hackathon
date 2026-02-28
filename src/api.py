@@ -100,6 +100,10 @@ INTENT_PATTERNS = {
         r"staff", r"employee", r"shift", r"schedule", r"headcount",
         r"workers?", r"how many people",
     ],
+    "forecast": [
+        r"forecast", r"demand", r"predict", r"future", r"next month",
+        r"inventory", r"trend", r"growth", r"sales projection",
+    ],
 }
 
 KNOWN_BRANCHES = ["Conut - Tyre", "Conut Jnah", "Main Street Coffee", "Conut"]
@@ -221,7 +225,111 @@ if FASTAPI_AVAILABLE:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    # ── 3. Natural Language /ask (OpenClaw main hook) ─────────
+    # ── 3. Demand Forecasting ─────────────────────────────────
+    @app.get("/forecast/demand")
+    def forecast_demand(
+        branch: str = Query(..., description="Branch name"),
+        months: int = Query(3, ge=1, le=12, description="Forecast horizon in months")
+    ):
+        """
+        Get demand forecast for a specific branch.
+        Returns predicted demand with confidence intervals.
+        """
+        try:
+            result = run_demand_forecast_analysis(
+                branch=branch,
+                months=months,
+                analysis_type='forecast'
+            )
+            return JSONResponse(content=_safe_dict(result))
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/forecast/all-branches")
+    def forecast_all_branches(
+        months: int = Query(3, ge=1, le=12, description="Forecast horizon in months")
+    ):
+        """
+        Get demand forecasts for all branches.
+        Returns comparative analysis across all locations.
+        """
+        try:
+            result = run_demand_forecast_analysis(
+                months=months,
+                analysis_type='all_branches'
+            )
+            return JSONResponse(content=_safe_dict(result))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/forecast/trends")
+    def forecast_trends(
+        branch: str = Query(..., description="Branch name"),
+        lookback: int = Query(12, ge=1, le=24, description="Historical months to analyze")
+    ):
+        """
+        Analyze historical trends and seasonality for a branch.
+        Returns trend direction, growth rate, and seasonal patterns.
+        """
+        try:
+            result = run_demand_forecast_analysis(
+                branch=branch,
+                months=lookback,
+                analysis_type='trends'
+            )
+            return JSONResponse(content=_safe_dict(result))
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/forecast/compare")
+    def forecast_compare(
+        months: int = Query(3, ge=1, le=12, description="Forecast horizon"),
+    ):
+        """
+        Compare forecasted performance across all branches.
+        Returns ranking and percentage distribution.
+        """
+        try:
+            all_forecast = run_demand_forecast_analysis(
+                months=months,
+                analysis_type='all_branches'
+            )
+            
+            # Build comparison list
+            comparisons = []
+            for branch, fc in all_forecast['branches'].items():
+                total_demand = sum(f['predicted_demand'] for f in fc['forecast'])
+                growth_rate = fc['model_accuracy'].get('growth_rate', 0) if 'model_accuracy' in fc else 0
+                
+                comparisons.append({
+                    'branch': branch,
+                    'total_predicted_demand': total_demand,
+                    'percentage_of_total': fc.get('percentage_of_total', 0),
+                    'growth_rate': growth_rate
+                })
+            
+            # Sort by demand
+            comparisons.sort(key=lambda x: x['total_predicted_demand'], reverse=True)
+            
+            # Add rank
+            for i, comp in enumerate(comparisons, 1):
+                comp['rank'] = i
+            
+            result = {
+                'forecast_period': months,
+                'comparison': comparisons,
+                'recommendation': f"Focus inventory expansion on {comparisons[0]['branch']} (highest forecasted demand)" if comparisons else "No data available"
+            }
+            
+            return JSONResponse(content=_safe_dict(result))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # ── 4. Natural Language /ask (OpenClaw main hook) ─────────
     @app.get("/ask")
     def ask(
         query: str = Query(..., description="Natural language operational query"),
@@ -260,17 +368,35 @@ if FASTAPI_AVAILABLE:
                     data["query"] = query
                     return JSONResponse(content=data)
                 return result
+            elif intent == "forecast":
+                b = branch or "Conut Jnah"
+                # Extract months if mentioned
+                months_match = re.search(r'(\d+)\s*month', query, re.IGNORECASE)
+                months = int(months_match.group(1)) if months_match else 3
+                months = min(max(months, 1), 12)  # Clamp 1-12
+                
+                result = run_demand_forecast_analysis(
+                    branch=b,
+                    months=months,
+                    analysis_type='forecast'
+                )
+                result['intent'] = 'forecast'
+                result['query'] = query
+                return JSONResponse(content=_safe_dict(result))
             else:
                 return JSONResponse(content={
                     "query": query,
                     "intent": "unknown",
                     "message": (
                         "Query not understood. Try asking about: "
-                        "expansion feasibility or branch staffing."
+                        "expansion feasibility, branch staffing, or demand forecasting."
                     ),
                     "available_endpoints": [
                         "/expansion",
                         "/staffing/{branch}",
+                        "/forecast/demand?branch={branch}&months={n}",
+                        "/forecast/all-branches",
+                        "/forecast/trends?branch={branch}",
                     ],
                 })
         except Exception as e:
