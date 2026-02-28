@@ -182,3 +182,9 @@ All CSV files are in the `data/` folder:
     `-- conut-ops/
         `-- SKILL.md                    # OpenClaw skill definition
 ```
+
+Here are the screenshots taken from Open Claw:
+<img width="2549" height="1115" alt="Screenshot 2026-02-28 202248" src="https://github.com/user-attachments/assets/1ff7713a-b63c-4849-99ec-9493a43f847b" />
+<img width="2559" height="1101" alt="Screenshot 2026-02-28 202237" src="https://github.com/user-attachments/assets/51d39aab-af20-4f21-9492-5574f1dfe412" />
+<img width="2559" height="1411" alt="Screenshot 2026-02-28 191012" src="https://github.com/user-attachments/assets/5999bc67-24da-43c5-acc5-159fb89df4b6" />
+<img width="2556" height="1506" alt="Screenshot 2026-02-28 202300" src="https://github.com/user-attachments/assets/a84451e2-d199-41e2-a1ac-c237c4f993e1" />
