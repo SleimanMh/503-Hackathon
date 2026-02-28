@@ -37,6 +37,7 @@ models/
 # Dataset
 data/
 datasets/
+app/
 *.csv
 *.tsv
 
