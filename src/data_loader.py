@@ -98,7 +98,7 @@ def load_monthly_sales() -> pd.DataFrame:
 # Average Sales by Menu  (rep_s_00435_SMRY.csv)
 # ─────────────────────────────────────────────────────────
 
-KNOWN_BRANCHES = {"Conut - Tyre", "Conut", "Conut Jnah", "Main Street Coffee"}
+KNOWN_BRANCHES = ["Main Street Coffee", "Conut Jnah", "Conut - Tyre", "Conut"]  # longest first to avoid substring mis-match
 
 
 def load_avg_sales_by_menu() -> pd.DataFrame:
