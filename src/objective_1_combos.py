@@ -1,6 +1,22 @@
 """
-Conut AI Operations Agent - Objective 1: Combo Optimization
-FastAPI service for identifying optimal product combinations based on customer purchasing patterns
+OBJECTIVE 1: Combo Optimization
+================================
+Conut AI Engineering Hackathon
+
+Purpose:
+  Identify optimal product combinations based on customer purchasing patterns.
+  
+Implementation:
+  - Uses ML-based association rule mining (Apriori algorithm)
+  - Analyzes real customer transaction data from REP_S_00502.csv
+  - Calculates support, confidence, and lift metrics
+  - Provides branch-specific recommendations
+  
+API Endpoints:
+  - GET /api/combos/analysis - Full combo analysis
+  - GET /api/combos/top - Top N combos by metric
+  - GET /api/combos/by-branch/{branch} - Branch-specific combos
+  - POST /api/combos/recommend - Product pairing recommendations
 """
 
 import pandas as pd

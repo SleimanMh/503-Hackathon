@@ -42,8 +42,9 @@ except ImportError:
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from src.expansion_engine import run_expansion_analysis
-from src.staffing_engine import run_staffing_analysis
+from src.objective_3_expansion import run_expansion_analysis
+from src.objective_4_staffing import run_staffing_analysis
+from src.objective_2_demand_forecast import run_demand_forecast_analysis
 
 # ─────────────────────────────────────────────────────────
 # Cache layer — analyses are expensive; cache for the session
@@ -285,12 +286,16 @@ if __name__ == "__main__":
         print("FastAPI not installed. Run: pip install fastapi uvicorn")
         print("Falling back to CLI mode — printing all reports:")
         print("\n--- EXPANSION ---")
-        from src.expansion_engine import print_report
+        from src.objective_3_expansion import print_report
         print_report(run_expansion_analysis())
 
         print("\n--- STAFFING ---")
-        from src.staffing_engine import print_staffing_report
+        from src.objective_4_staffing import print_staffing_report
         print_staffing_report(run_staffing_analysis())
+        
+        print("\n--- DEMAND FORECAST ---")
+        from src.objective_2_demand_forecast import print_demand_forecast_report
+        print_demand_forecast_report(run_demand_forecast_analysis())
     else:
         import uvicorn
         uvicorn.run(

@@ -69,6 +69,16 @@ def load_products_by_division(filepath='rep_s_00191_SMRY.csv'):
     Load and parse product sales data from rep_s_00191_SMRY.csv
     Extracts division-level totals and individual products
     """
+    from pathlib import Path
+    
+    # Check data/ folder first, then root
+    filepath_obj = Path(filepath)
+    if not filepath_obj.exists():
+        filepath_obj = Path('data') / filepath_obj.name
+        if not filepath_obj.exists():
+            raise FileNotFoundError(f"Could not find {filepath} in current directory or data/ folder")
+    
+    filepath = str(filepath_obj)
     print(f"Loading product data from {filepath}...")
     
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -147,6 +157,16 @@ def load_customers(filepath='rep_s_00150.csv'):
     """
     Load customer data from rep_s_00150.csv
     """
+    from pathlib import Path
+    
+    # Check data/ folder first, then root
+    filepath_obj = Path(filepath)
+    if not filepath_obj.exists():
+        filepath_obj = Path('data') / filepath_obj.name
+        if not filepath_obj.exists():
+            raise FileNotFoundError(f"Could not find {filepath} in current directory or data/ folder")
+    
+    filepath = str(filepath_obj)
     print(f"Loading customer data from {filepath}...")
     
     with open(filepath, 'r', encoding='utf-8') as f:
