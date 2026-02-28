@@ -18,9 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"  # CSVs live in the data/ folder
 
 
-# ─────────────────────────────────────────────────────────
 # Low-level helpers
-# ─────────────────────────────────────────────────────────
 
 def _read_csv_rows(path: Path) -> List[List[str]]:
     """Read a CSV file respecting quoted fields (handles commas inside quotes)."""

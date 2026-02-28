@@ -34,13 +34,6 @@ logs/
 *.pth
 models/
 
-# Dataset
-data/
-datasets/
-app/
-*.csv
-*.tsv
-
 # OS files
 .DS_Store
 Thumbs.db

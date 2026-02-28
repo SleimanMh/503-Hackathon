@@ -436,6 +436,11 @@ INTENT_PATTERNS = {
         r"coffee", r"milkshake", r"beverage", r"drink", r"growth",
         r"increase.*sales", r"boost.*revenue", r"strategy"
     ],
+    "forecast": [
+        r"forecast", r"demand", r"predict", r"future", r"next month",
+        r"inventory", r"trend", r"projection", r"sales.*forecast",
+        r"upcoming", r"expected.*sales"
+    ],
 }
 
 KNOWN_BRANCHES = ["Conut - Tyre", "Conut Jnah", "Main Street Coffee", "Conut"]
@@ -842,6 +847,121 @@ async def get_growth_strategy():
 
 
 # ───────────────────────────────────────────────────────────────────────────
+# OBJECTIVE 2: DEMAND FORECASTING ENDPOINTS
+# ───────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/forecast/demand")
+async def forecast_demand(
+    branch: str = Query(..., description="Branch name (supports fuzzy matching)"),
+    months: int = Query(3, ge=1, le=12, description="Forecast horizon in months")
+):
+    """
+    Objective 2: Get demand forecast for a specific branch
+    
+    Returns predicted demand with confidence intervals and business insights.
+    Supports fuzzy branch matching (e.g., 'tyre' → 'Conut - Tyre').
+    """
+    try:
+        result = run_demand_forecast_analysis(
+            branch=branch,
+            months=months,
+            analysis_type='forecast'
+        )
+        return JSONResponse(content=_safe_dict(result))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/forecast/all-branches")
+async def forecast_all_branches(
+    months: int = Query(3, ge=1, le=12, description="Forecast horizon in months")
+):
+    """
+    Objective 2: Get demand forecasts for all branches
+    
+    Returns comparative analysis across all locations with total company demand.
+    """
+    try:
+        result = run_demand_forecast_analysis(
+            months=months,
+            analysis_type='all_branches'
+        )
+        return JSONResponse(content=_safe_dict(result))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/forecast/trends")
+async def forecast_trends(
+    branch: str = Query(..., description="Branch name (supports fuzzy matching)"),
+    lookback: int = Query(12, ge=1, le=24, description="Historical months to analyze")
+):
+    """
+    Objective 2: Analyze historical trends and seasonality for a branch
+    
+    Returns trend direction, growth rate, and seasonal patterns.
+    """
+    try:
+        result = run_demand_forecast_analysis(
+            branch=branch,
+            months=lookback,
+            analysis_type='trends'
+        )
+        return JSONResponse(content=_safe_dict(result))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/forecast/compare")
+async def forecast_compare(
+    months: int = Query(3, ge=1, le=12, description="Forecast horizon")
+):
+    """
+    Objective 2: Compare forecasted performance across all branches
+    
+    Returns ranking and percentage distribution of predicted demand.
+    """
+    try:
+        all_forecast = run_demand_forecast_analysis(
+            months=months,
+            analysis_type='all_branches'
+        )
+        
+        # Build comparison list
+        comparisons = []
+        for branch, fc in all_forecast['branches'].items():
+            total_demand = sum(f['predicted_demand'] for f in fc['forecast'])
+            
+            comparisons.append({
+                'branch': branch,
+                'total_predicted_demand': total_demand,
+                'percentage_of_total': fc.get('percentage_of_total', 0),
+            })
+        
+        # Sort by demand
+        comparisons.sort(key=lambda x: x['total_predicted_demand'], reverse=True)
+        
+        # Add rank
+        for i, comp in enumerate(comparisons, 1):
+            comp['rank'] = i
+        
+        result = {
+            'forecast_period': months,
+            'comparison': comparisons,
+            'total_company_demand': all_forecast.get('total_company_demand', 0),
+            'recommendation': f"Focus inventory expansion on {comparisons[0]['branch']} (highest forecasted demand)" if comparisons else "No data available"
+        }
+        
+        return JSONResponse(content=_safe_dict(result))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ───────────────────────────────────────────────────────────────────────────
 # NATURAL LANGUAGE ENDPOINT (OpenClaw Integration)
 # ───────────────────────────────────────────────────────────────────────────
 
@@ -919,15 +1039,40 @@ async def ask_natural_language(query: str = Query(..., description="Natural lang
                     "recommendation": insights['opportunities'][0]['name'] if insights.get('opportunities') else "No recommendations"
                 })
         
+        elif intent == "forecast":
+            target_branch = branch or "Conut Jnah"
+            # Extract months if mentioned
+            months_match = re.search(r'(\d+)\s*month', query, re.IGNORECASE)
+            months = int(months_match.group(1)) if months_match else 3
+            months = min(max(months, 1), 12)  # Clamp 1-12
+            
+            forecast_result = run_demand_forecast_analysis(
+                branch=target_branch,
+                months=months,
+                analysis_type='forecast'
+            )
+            
+            return JSONResponse(content={
+                "query": query,
+                "intent": "forecast",
+                "objective": 2,
+                "branch": forecast_result['branch'],
+                "forecast_horizon": forecast_result['forecast_horizon'],
+                "forecast": forecast_result['forecast'][:3],  # First 3 months
+                "insights": forecast_result['insights'],
+                "recommendation": forecast_result['insights'][0] if forecast_result['insights'] else "Demand forecast generated"
+            })
+        
         return JSONResponse(content={
             "query": query,
             "intent": "unknown",
-            "message": "Query not understood. Try asking about: expansion, staffing, combos, or growth strategy.",
+            "message": "Query not understood. Try asking about: expansion, staffing, combos, growth strategy, or demand forecast.",
             "available_endpoints": {
                 "expansion": "/api/expansion",
                 "staffing": "/api/staffing/{branch}",
                 "combos": "/api/combos/analysis",
-                "growth": "/api/growth"
+                "growth": "/api/growth",
+                "forecast": "/api/forecast/demand?branch={branch}&months={n}"
             }
         })
     
