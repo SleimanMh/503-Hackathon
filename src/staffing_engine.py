@@ -26,6 +26,8 @@ from typing import Dict, List
 
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler
 
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -257,35 +259,70 @@ def staffing_report_all_branches(
 
 def detect_staffing_anomalies(att: pd.DataFrame) -> pd.DataFrame:
     """
-    Flags:
-    - Very long shifts (> 14 hours) — potential logging errors or exploitation
-    - Very short shifts (< 1 hour) — ghost punches
-    - Employees with > 25 hours in a single entry (system error)
+    Detect anomalous shifts using a scikit-learn IsolationForest model.
+
+    The model is trained unsupervised on two features per shift record:
+      - duration_hours   : how long the shift lasted
+      - shift_start_hour : hour of day the shift began
+
+    IsolationForest isolates observations by randomly partitioning the
+    feature space. Points that require fewer splits to isolate are flagged
+    as anomalies (contamination=0.10 → top 10% most isolated = anomalous).
+
+    Additionally, extreme system errors (>25h) are always included regardless
+    of the model's decision.
     """
+    if att.empty:
+        return pd.DataFrame(columns=["emp_id", "branch", "date", "issue", "value", "anomaly_score"])
+
+    # Feature matrix: duration_hours + shift_start_hour
+    feature_cols = ["duration_hours", "shift_start_hour"]
+    X = att[feature_cols].fillna(0).values.astype(float)
+
+    # Scale features before fitting
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Fit IsolationForest
+    iso = IsolationForest(
+        n_estimators=100,
+        contamination=0.10,   # expect ~10% of shifts to be anomalous
+        random_state=42,
+        n_jobs=-1,
+    )
+    iso.fit(X_scaled)
+
+    predictions = iso.predict(X_scaled)        # -1 = anomaly, +1 = normal
+    scores = iso.score_samples(X_scaled)       # lower = more anomalous
+
     flags = []
+    for idx, (pred, score) in enumerate(zip(predictions, scores)):
+        row = att.iloc[idx]
+        issue = None
 
-    long_shifts = att[att["duration_hours"] > 14]
-    for _, row in long_shifts.iterrows():
-        flags.append({
-            "emp_id": row["emp_id"],
-            "branch": row["branch"],
-            "date": row["date"],
-            "issue": "LONG SHIFT",
-            "value": f"{row['duration_hours']:.1f} hours",
-        })
+        if row["duration_hours"] > 25:
+            issue = "SYSTEM ERROR (>25h)"
+        elif pred == -1:
+            # Classify the anomaly type based on the dominant signal
+            if row["duration_hours"] > 14:
+                issue = "LONG SHIFT"
+            elif row["duration_hours"] < 1:
+                issue = "SHORT SHIFT / GHOST PUNCH"
+            else:
+                issue = "UNUSUAL SHIFT PATTERN"
 
-    system_errors = att[att["duration_hours"] > 25]
-    for _, row in system_errors.iterrows():
-        flags.append({
-            "emp_id": row["emp_id"],
-            "branch": row["branch"],
-            "date": row["date"],
-            "issue": "SYSTEM ERROR (>25h)",
-            "value": f"{row['duration_hours']:.1f} hours",
-        })
+        if issue:
+            flags.append({
+                "emp_id": row["emp_id"],
+                "branch": row["branch"],
+                "date": row["date"],
+                "issue": issue,
+                "value": f"{row['duration_hours']:.1f}h @ {row['shift_type']}",
+                "anomaly_score": round(float(score), 4),
+            })
 
     return pd.DataFrame(flags) if flags else pd.DataFrame(
-        columns=["emp_id", "branch", "date", "issue", "value"]
+        columns=["emp_id", "branch", "date", "issue", "value", "anomaly_score"]
     )
 
 
@@ -311,6 +348,7 @@ def run_staffing_analysis() -> Dict:
         "staffing_recommendations": staffing,
         "anomalies": anomalies,
         "raw_attendance": att,
+        "ml_anomaly_model": "IsolationForest(n_estimators=100, contamination=0.10)",
     }
 
 
@@ -348,7 +386,9 @@ def print_staffing_report(result: Dict) -> None:
     anom = result["anomalies"]
     if not anom.empty:
         print(f"\n[5] Attendance Anomalies Detected: {len(anom)}")
-        print(anom.to_string(index=False))
+        print(f"    Model: {result.get('ml_anomaly_model', 'N/A')}")
+        display_cols = [c for c in ["emp_id","branch","date","issue","value","anomaly_score"] if c in anom.columns]
+        print(anom[display_cols].to_string(index=False))
     else:
         print("\n[5] No significant attendance anomalies detected.")
 

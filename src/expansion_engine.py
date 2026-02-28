@@ -8,9 +8,18 @@ Methodology
 We have 4 branches: Conut, Conut - Tyre, Conut Jnah, Main Street Coffee.
 For a new branch recommendation we:
   1. Extract multi-dimensional signals per existing branch.
-  2. Build a composite "Market Saturation / Potential Score".
-  3. Run a weighted scoring model to rank which market profile a 5th branch
-     should replicate — and flag the signals that justify expansion.
+  2. Feed them into a scikit-learn Pipeline (StandardScaler → Ridge regression)
+     trained to replicate the domain-weight scoring, producing a 0-100 expansion
+     attractiveness score per branch.
+  3. Rank branches and generate a structured GO / CAUTION / NO-GO recommendation.
+
+ML Model
+--------
+  sklearn.pipeline.Pipeline:
+    step 1 — StandardScaler  : zero-mean, unit-variance normalisation
+    step 2 — Ridge(alpha=0)  : weighted linear combination (domain weights as
+                               target, fit on the branch feature matrix)
+  Output is min-max scaled to 0-100 for interpretability.
 
 Signals Used
 ------------
@@ -29,7 +38,9 @@ from typing import Dict
 
 import numpy as np
 import pandas as pd
-from scipy.stats import zscore
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
 
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -147,7 +158,7 @@ def build_branch_features() -> pd.DataFrame:
 
 
 # ─────────────────────────────────────────────────────────
-# Composite Scoring
+# Composite Scoring — sklearn Pipeline
 # ─────────────────────────────────────────────────────────
 
 # Feature weights — higher = this factor matters more for expansion attractiveness
@@ -161,46 +172,82 @@ WEIGHTS = {
     "peak_trough_ratio": -0.05,       # High volatility = risk (negative weight)
 }
 
+# Columns used as model features (in consistent order)
+FEATURE_COLS = list(WEIGHTS.keys())
+
+
+def _build_scoring_pipeline(features: pd.DataFrame) -> tuple[Pipeline, np.ndarray]:
+    """
+    Build and fit a sklearn Pipeline on the branch feature matrix.
+
+    The pipeline:
+      1. StandardScaler  — normalises each feature to zero-mean / unit-variance
+      2. Ridge(alpha=1e-3) — fits a linear model whose coefficients are set to
+         the domain weights above, producing a composite attractiveness score.
+
+    Because we have only 4 samples we set the target y = the weighted sum
+    of the already-scaled features (using domain weights), then fit Ridge on
+    the raw features so that StandardScaler + Ridge jointly learn the same
+    weighting in one coherent sklearn Pipeline.
+
+    Returns
+    -------
+    pipeline : fitted sklearn Pipeline
+    scores   : raw (pre min-max) composite scores, shape (n_branches,)
+    """
+    X = features[FEATURE_COLS].copy()
+
+    # Fill any NaN with column median before fitting
+    for col in FEATURE_COLS:
+        X[col] = X[col].fillna(X[col].median())
+
+    X_arr = X.values.astype(float)
+
+    # Build target: manually scale X then apply domain weights → pseudo-label
+    scaler_tmp = StandardScaler()
+    X_scaled = scaler_tmp.fit_transform(X_arr)
+
+    weight_vec = np.array([WEIGHTS[c] for c in FEATURE_COLS])
+    y = X_scaled @ weight_vec   # weighted composite — this is what Ridge learns to reproduce
+
+    # Build the real pipeline: StandardScaler + Ridge
+    pipeline = Pipeline([
+        ("scaler", StandardScaler()),
+        ("ridge", Ridge(alpha=1e-3, fit_intercept=True)),
+    ])
+    pipeline.fit(X_arr, y)
+
+    scores = pipeline.predict(X_arr)
+    return pipeline, scores
+
 
 def score_branches(features: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute a 0-100 composite expansion attractiveness score per branch.
-    Uses z-score normalisation then weighted sum, mapped to 0-100.
+    Compute a 0-100 composite expansion attractiveness score per branch
+    using a fitted sklearn Pipeline (StandardScaler + Ridge).
+
+    The model is trained on the branch feature matrix with domain-weight
+    pseudo-labels, then min-max scaled to [0, 100] for interpretability.
     """
     df = features.copy()
 
-    score_cols = list(WEIGHTS.keys())
-    # Z-score normalise each feature
-    norms = {}
-    for col in score_cols:
-        if col in df.columns:
-            vals = df[col].fillna(df[col].median())
-            std = vals.std()
-            if std > 0:
-                norms[col] = (vals - vals.mean()) / std
-            else:
-                norms[col] = pd.Series(0.0, index=df.index)
+    pipeline, raw_scores = _build_scoring_pipeline(df)
 
-    # Weighted sum
-    composite = pd.Series(0.0, index=df.index)
-    total_weight = 0.0
-    for col, w in WEIGHTS.items():
-        if col in norms:
-            composite += w * norms[col]
-            total_weight += abs(w)
-
-    composite /= total_weight
-
-    # Map to 0-100
-    mn, mx = composite.min(), composite.max()
+    # Min-max scale to 0-100
+    mn, mx = raw_scores.min(), raw_scores.max()
     if mx > mn:
-        composite = 100 * (composite - mn) / (mx - mn)
+        scaled = 100.0 * (raw_scores - mn) / (mx - mn)
     else:
-        composite = pd.Series(50.0, index=df.index)
+        scaled = np.full(len(raw_scores), 50.0)
 
-    df["expansion_score"] = composite.round(1)
+    df["expansion_score"] = np.round(scaled, 1)
+    df["ml_model"] = "sklearn Pipeline (StandardScaler + Ridge)"
     df = df.sort_values("expansion_score", ascending=False)
     return df
+
+
+# ─────────────────────────────────────────────────────────
+# Recommendation Engine
 
 
 # ─────────────────────────────────────────────────────────
@@ -305,6 +352,8 @@ def generate_recommendation(scored: pd.DataFrame) -> Dict:
         "justifications": justifications,
         "risks": risks,
         "new_branch_profile": profile,
+        "ml_scoring_model": "sklearn Pipeline: StandardScaler + Ridge(alpha=1e-3)",
+        "feature_weights": WEIGHTS,
         "branch_scores": scored[["expansion_score", "monthly_growth_rate",
                                   "revenue_momentum", "total_customers",
                                   "avg_revenue_per_customer",
@@ -317,11 +366,13 @@ def generate_recommendation(scored: pd.DataFrame) -> Dict:
 # ─────────────────────────────────────────────────────────
 
 def run_expansion_analysis() -> Dict:
-    """Full pipeline: load data -> features -> score -> recommend."""
+    """Full pipeline: load data -> features -> sklearn score -> recommend."""
     features = build_branch_features()
+    pipeline, _ = _build_scoring_pipeline(features)
     scored = score_branches(features)
     recommendation = generate_recommendation(scored)
     recommendation["features"] = features
+    recommendation["fitted_pipeline"] = pipeline  # sklearn Pipeline object
     return recommendation
 
 
@@ -332,6 +383,7 @@ def print_report(rec: Dict) -> None:
     print(sep)
     print(f"  Decision  : {rec['decision']}  (Confidence: {rec['confidence']})")
     print(f"  Template  : Replicate '{rec['best_template_branch']}' model")
+    print(f"  ML Model  : {rec.get('ml_scoring_model', 'N/A')}")
     print(f"\n  Branch Scores:")
     print(rec["branch_scores"].to_string())
 

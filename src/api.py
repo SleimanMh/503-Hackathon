@@ -159,6 +159,7 @@ if FASTAPI_AVAILABLE:
                 "decision": rec["decision"],
                 "confidence": rec["confidence"],
                 "best_template_branch": rec["best_template_branch"],
+                "ml_scoring_model": rec.get("ml_scoring_model"),
                 "justifications": rec["justifications"],
                 "risks": rec["risks"],
                 "branch_scores": _safe_dict(rec["branch_scores"]),
@@ -203,6 +204,7 @@ if FASTAPI_AVAILABLE:
 
             payload = {
                 "branch": matched,
+                "ml_anomaly_model": result.get("ml_anomaly_model"),
                 "staffing_by_shift": rec.get(matched, {}),
                 "attendance_summary": _safe_dict(
                     att_stats.loc[[matched]] if matched in att_stats.index else {}
