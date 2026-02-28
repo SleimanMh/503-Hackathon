@@ -1,0 +1,54 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.env/
+.venv/
+ENV/
+env/
+
+# Conda
+conda-meta/
+
+# Pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Logs
+logs/
+*.log
+
+# ML Models
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+models/
+
+# Dataset
+data/
+datasets/
+*.csv
+*.tsv
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# AWS credentials
+.aws/
